@@ -46,18 +46,18 @@ def numpy_to_pil(images):
 
 
 def load_model_from_config(config, ckpt, verbose=False):
-    print(f"Loading model from {ckpt}")
+    print(f"加载模型：{ckpt}")
     pl_sd = torch.load(ckpt, map_location="cpu")
     if "global_step" in pl_sd:
-        print(f"Global Step: {pl_sd['global_step']}")
-    sd = pl_sd["state_dict"]
+        print(f"总采样步数：{pl_sd['global_step']}")
+    sd = pl_sd    #使用原版模型此处需改为pl_sd["state_dict"]
     model = instantiate_from_config(config.model)
     m, u = model.load_state_dict(sd, strict=False)
     if len(m) > 0 and verbose:
-        print("missing keys:")
+        print("丢失关键词：")
         print(m)
     if len(u) > 0 and verbose:
-        print("unexpected keys:")
+        print("未定义关键词：")
         print(u)
 
     model.cpu()
@@ -101,7 +101,7 @@ def main():
         "--prompt",
         type=str,
         nargs="?",
-        default="a painting of a virus monster playing guitar",
+        default="best quality, masterpiece, highres, original, extremely detailed wallpaper, ultra-detailed, illustration, disheveled hair",    #描述
         help="the prompt to render"
     )
     parser.add_argument(
@@ -109,7 +109,7 @@ def main():
         type=str,
         nargs="?",
         help="dir to write results to",
-        default="outputs/txt2img-samples"
+        default="outputs/SuzukiToi10"    #图片存储路径
     )
     parser.add_argument(
         "--skip_grid",
@@ -124,7 +124,7 @@ def main():
     parser.add_argument(
         "--ddim_steps",
         type=int,
-        default=50,
+        default=50,    #原为50，采样步数
         help="number of ddim sampling steps",
     )
     parser.add_argument(
@@ -151,19 +151,19 @@ def main():
     parser.add_argument(
         "--n_iter",
         type=int,
-        default=2,
+        default=8,    #原为2，生成图片次数
         help="sample this often",
     )
     parser.add_argument(
         "--H",
         type=int,
-        default=512,
+        default=512,    #原为512，图片高度
         help="image height, in pixel space",
     )
     parser.add_argument(
         "--W",
         type=int,
-        default=512,
+        default=512,    #原为512，图片宽度
         help="image width, in pixel space",
     )
     parser.add_argument(
@@ -181,7 +181,7 @@ def main():
     parser.add_argument(
         "--n_samples",
         type=int,
-        default=3,
+        default=1,    #原为3，每次生成图片数量
         help="how many samples to produce for each given prompt. A.k.a. batch size",
     )
     parser.add_argument(
@@ -210,7 +210,7 @@ def main():
     parser.add_argument(
         "--ckpt",
         type=str,
-        default="models/ldm/stable-diffusion-v1/model.ckpt",
+        default="models/ldm/animefull-latest/model.ckpt",
         help="path to checkpoint of model",
     )
     parser.add_argument(
@@ -224,12 +224,12 @@ def main():
         type=str,
         help="evaluate at this precision",
         choices=["full", "autocast"],
-        default="full"
+        default="full"    #原为autocast
     )
     opt = parser.parse_args()
 
     if opt.laion400m:
-        print("Falling back to LAION 400M model...")
+        print("回到LAION400M模型...")
         opt.config = "configs/latent-diffusion/txt2img-1p4B-eval.yaml"
         opt.ckpt = "models/ldm/text2img-large/model.ckpt"
         opt.outdir = "outputs/txt2img-samples-laion400m"
@@ -250,7 +250,7 @@ def main():
     os.makedirs(opt.outdir, exist_ok=True)
     outpath = opt.outdir
 
-    print("Creating invisible watermark encoder (see https://github.com/ShieldMnt/invisible-watermark)...")
+    print("添加隐形水印...")
     wm = "StableDiffusionV1"
     wm_encoder = WatermarkEncoder()
     wm_encoder.set_watermark('bytes', wm.encode('utf-8'))
@@ -263,7 +263,7 @@ def main():
         data = [batch_size * [prompt]]
 
     else:
-        print(f"reading prompts from {opt.from_file}")
+        print(f"读取描述：{opt.from_file}")
         with open(opt.from_file, "r") as f:
             data = f.read().splitlines()
             data = list(chunk(data, batch_size))
@@ -306,7 +306,7 @@ def main():
                         x_samples_ddim = torch.clamp((x_samples_ddim + 1.0) / 2.0, min=0.0, max=1.0)
                         x_samples_ddim = x_samples_ddim.cpu().permute(0, 2, 3, 1).numpy()
 
-                        x_checked_image, has_nsfw_concept = check_safety(x_samples_ddim)
+                        x_checked_image = x_samples_ddim #x_checked_image, has_nsfw_concept = check_safety(x_samples_ddim)
 
                         x_checked_image_torch = torch.from_numpy(x_checked_image).permute(0, 3, 1, 2)
 
@@ -336,8 +336,7 @@ def main():
 
                 toc = time.time()
 
-    print(f"Your samples are ready and waiting for you here: \n{outpath} \n"
-          f" \nEnjoy.")
+    print(f"图片存储路径：{outpath}")
 
 
 if __name__ == "__main__":
